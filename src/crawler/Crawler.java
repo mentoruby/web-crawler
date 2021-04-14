@@ -110,11 +110,6 @@ public class Crawler extends Thread implements Runnable {
 	private boolean isLinkInScope(String href) {
 		String link = href;
 		
-		// TODO remove
-		if (!link.equalsIgnoreCase("https://monzo.com") && !link.equalsIgnoreCase("https://monzo.com/about")) {
-			return false;
-		}
-		
 		if(this.domain != null && !this.domain.isBlank()) {
 			// not in the same domain as input link
 			if(!link.startsWith(this.domain)) {
@@ -182,6 +177,9 @@ public class Crawler extends Thread implements Runnable {
 		while(!Thread.currentThread().isInterrupted())
 		{
 			try {
+				int remainingNumberOfLinks = linkInfo.getRoughNumberOfLinksRemainingToCrawl();
+				System.out.println(Thread.currentThread().getName() + " Rough number of links remaining to crawl: " + remainingNumberOfLinks);
+				
 				this.path = linkInfo.getNextLinkToCrawl();
 				if (this.path == null || this.path.isBlank()) {
 					
@@ -209,7 +207,6 @@ public class Crawler extends Thread implements Runnable {
 				for (String link : links) {
 					if (isLinkInScope(link)) {
 						linkInfo.addLinkInScope(link);
-						linkInfo.addLinkToCrawl(link);
 						++countInScope;
 					}
 					else {

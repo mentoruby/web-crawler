@@ -25,9 +25,8 @@ public class Starter {
 		
 		LinkInfo linkInfo = new LinkInfo();
 		linkInfo.addLinkInScope(args[0]);
-		linkInfo.addLinkToCrawl(args[0]);
 		
-		int maxNumOfThreads = 2;
+		int maxNumOfThreads = 3;
 		
 		List<Crawler> crawlers = new ArrayList<Crawler>();
 		for (int i=0; i<maxNumOfThreads; i++) {
