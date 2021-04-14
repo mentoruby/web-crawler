@@ -11,14 +11,13 @@ import java.util.regex.Pattern;
 
 import javax.net.ssl.HttpsURLConnection;
 
-public class Crawler implements Runnable {
+public class Crawler extends Thread implements Runnable {
 	private String path;
 	private String domain;
 	private LinkInfo linkInfo;
 	
 	public Crawler() {
 		linkInfo = new LinkInfo();
-		this.path = linkInfo.getNextLinkToCrawl();
 	}
 	
 	private String getHTMLContent() throws Exception {
@@ -32,8 +31,6 @@ public class Crawler implements Runnable {
 			if (url.getPort() > 0) {
 				this.domain += ":" + url.getPort();
 			}
-			
-			System.out.println(Thread.currentThread().getName() + " Domain: " + this.domain);
 			
 			con = (HttpsURLConnection) url.openConnection();
 			con.setRequestMethod("GET");
@@ -50,7 +47,6 @@ public class Crawler implements Runnable {
 					content.append(line);
 				}
 				
-//				System.out.println(content);
 				return content.toString();
 			} else {
 				throw new Exception(Thread.currentThread().getName() + " Error: Invalid response code (" + responseCode + ") when accessing " + this.path);
@@ -76,16 +72,6 @@ public class Crawler implements Runnable {
 			}
 		}
 	}
-	
-//	private String getFileContent() throws Exception {
-//		System.out.println(Thread.currentThread().getName() + " Getting content of " + this.path);
-//		this.domain = "https://monzo.com";
-//		System.out.println(Thread.currentThread().getName() + " Domain: " + this.domain);
-//		
-//		String content = Files.readString(Path.of(this.path));
-////        System.out.println(content);
-//        return content;
-//	}
 	
 	private String formatHref(String href) {
 		String link = removeQuotes(href);
@@ -114,7 +100,7 @@ public class Crawler implements Runnable {
 			return link;
 		}
 		
-		if (!link.contains("://")) {
+		if (!link.contains("://") && !link.startsWith("#")) {
 			return "http://" + link;
 		}
 		
@@ -174,7 +160,6 @@ public class Crawler implements Runnable {
 	
 	private Set<String> findLinks() throws Exception {
 		String content = this.getHTMLContent();
-//		String content = this.getFileContent();
 		if(content == null || content.isBlank()) {
 			return null;
 		}
@@ -194,33 +179,52 @@ public class Crawler implements Runnable {
 
 	@Override
 	public void run() {
-		try {
-			System.out.println(Thread.currentThread().getName() + " starts to crawl " + this.path);
-			
-			if (this.path == null || this.path.isBlank()) {
-				return;
-			}
-			
-			Set<String> links = this.findLinks();
-			
-			if(links == null || links.isEmpty()) {
-				System.out.println(Thread.currentThread().getName() + " No link found in " + this.path);
-				return;
-			}
-			
-			System.out.println(Thread.currentThread().getName() + " Number of links found in " + this.path + ": " + links.size());
-			
-			for (String link : links) {
-				if (isLinkInScope(link)) {
-					linkInfo.addLinksInScope(link);
+		while(!Thread.currentThread().isInterrupted())
+		{
+			try {
+				this.path = linkInfo.getNextLinkToCrawl();
+				if (this.path == null || this.path.isBlank()) {
+					
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException ex) {
+						System.out.println(Thread.currentThread().getName() + " is interrupted during sleeping");
+						return;
+					}
+					
+					continue;
 				}
-				else {
-					linkInfo.addLinksOutOfScope(link);
+				
+				System.out.println(Thread.currentThread().getName() + " starts to crawl " + this.path);
+				
+				Set<String> links = this.findLinks();
+				
+				if(links == null || links.isEmpty()) {
+					System.out.println(Thread.currentThread().getName() + " No link found in " + this.path);
+					continue;
 				}
+				
+				int countInScope = 0;
+				int countOutOfScope = 0;
+				for (String link : links) {
+					if (isLinkInScope(link)) {
+						linkInfo.addLinkInScope(link);
+						linkInfo.addLinkToCrawl(link);
+						++countInScope;
+					}
+					else {
+						linkInfo.addLinkOutOfScope(link);
+						++countOutOfScope;
+					}
+				}
+				
+				System.out.println(Thread.currentThread().getName() + " Number of links found: " + links.size() + "/" + countInScope + "/" + countOutOfScope + " in " + this.path);
+
+			} catch (Exception e) {
+				System.out.println(Thread.currentThread().getName() + " Error: Fail to find links in " + this.path + " due to " + e.getMessage() + ". Add it back to crawling list.");
+				// add back the link for crawling later
+				linkInfo.addLinkToCrawl(this.path);
 			}
-		} catch (Exception e) {
-			System.out.println(Thread.currentThread().getName() + " Error: Fail to find links in " + this.path);
-			e.printStackTrace();
 		}
 	}
 }

@@ -11,9 +11,34 @@ public class LinkInfo {
 	private static ConcurrentLinkedDeque<String> linksToCrawl = new ConcurrentLinkedDeque<String>();
 	private static Set<String> linksOutOfScope = Collections.synchronizedSet(new HashSet<String>());
 	
+	public void printLinksInScope() {
+		synchronized (linksInScope) {
+			System.out.println("links within scope: ");
+			int count = 1;
+			for (String link : linksInScope) {
+				System.out.println(count + ": " + link);
+				++count;
+			}
+		}
+	}
+	
+	public void printLinksOutOfScope() {
+		synchronized (linksOutOfScope) {
+			System.out.println("links not in scope: ");
+			int count = 1;
+			for (String link : linksOutOfScope) {
+				System.out.println(count + ": " + link);
+				++count;
+			}
+		}
+	}
+	
 	public void printLinksToCrawl() {
-		for(String link : linksToCrawl) {
-			System.out.println("link to crawl - " + link);
+		synchronized (linksToCrawl) {
+			System.out.println("links remaining to crawl: ");
+			for(String link : linksToCrawl) {
+				System.out.println("link to crawl - " + link);
+			}
 		}
 	}
 	
@@ -25,25 +50,20 @@ public class LinkInfo {
 		}
 	}
 	
-	public void addLinksInScope(String link) {
-		synchronized (linksInScope) {
-			if (!linksInScope.contains(link)) {
-				if (!linksToCrawl.contains(link)) {
-					linksToCrawl.add(link);
-				}
-				linksInScope.add(link);
-				System.out.println("link included - " + link);
+	public void addLinkToCrawl(String link) {
+		synchronized (linksToCrawl) {
+			if (!linksToCrawl.contains(link)) {
+				linksToCrawl.add(link);
 			}
 		}
 	}
 	
-	public void addLinksOutOfScope(String link) {
-		synchronized (linksOutOfScope) {
-			if (!linksOutOfScope.contains(link)) {
-				linksOutOfScope.add(link);
-				System.out.println("link excluded - " + link);
-			}
-		}	
+	public void addLinkInScope(String link) {
+		linksInScope.add(link);
+	}
+	
+	public void addLinkOutOfScope(String link) {
+		linksOutOfScope.add(link);
 	}
 	
 }
