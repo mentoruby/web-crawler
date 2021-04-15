@@ -2,7 +2,6 @@ package crawler;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.Set;
@@ -33,11 +32,12 @@ public class Crawler extends Thread implements Runnable {
 			}
 			
 			con = (HttpsURLConnection) url.openConnection();
+			con.addRequestProperty("User-Agent", "Mozilla");
 			con.setRequestMethod("GET");
 			
 			int responseCode = con.getResponseCode();
 			
-			if (responseCode == HttpURLConnection.HTTP_OK) {
+			if (responseCode == HttpsURLConnection.HTTP_OK) {
 				isr = new InputStreamReader(con.getInputStream());
 				br = new BufferedReader(isr);
 				
@@ -48,8 +48,10 @@ public class Crawler extends Thread implements Runnable {
 				}
 				
 				return content.toString();
+			} else if (responseCode == 404 || responseCode == 403) { // special exception handling for error code 404 and 403
+			    throw new PageLoadException(responseCode, "Invalid response code (" + responseCode + ")");
 			} else {
-				throw new Exception(Thread.currentThread().getName() + " Error: Invalid response code (" + responseCode + ") when accessing " + this.path);
+				throw new Exception("Invalid response code (" + responseCode + ")");
 			}
 		} catch (Exception e) {
 			System.out.println(Thread.currentThread().getName() + " Error: Fail to get HTML content from " + this.path);
@@ -86,7 +88,7 @@ public class Crawler extends Thread implements Runnable {
 			link = link.substring(0, link.length() - 1);
 		}
 		
-		if (this.domain != null && !this.domain.isBlank()) {
+		if (this.domain != null && this.domain.length() > 0) {
 			if(link.equals(this.domain)) {
 				return this.domain;
 			}
@@ -94,7 +96,7 @@ public class Crawler extends Thread implements Runnable {
 		}
 		
 		if (link.startsWith("/")) {
-			if (this.domain != null && !this.domain.isBlank()) {
+			if (this.domain != null && this.domain.length() > 0) {
 				return this.domain + link;
 			}
 			return link;
@@ -110,7 +112,7 @@ public class Crawler extends Thread implements Runnable {
 	private boolean isLinkInScope(String href) {
 		String link = href;
 		
-		if(this.domain != null && !this.domain.isBlank()) {
+		if(this.domain != null && this.domain.length() > 0) {
 			// not in the same domain as input link
 			if(!link.startsWith(this.domain)) {
 				return false;
@@ -118,6 +120,12 @@ public class Crawler extends Thread implements Runnable {
 			
 			link = link.replaceAll(this.domain, "");
 		}
+		
+		// pages forbidden by Cloudfare
+		if (link.contains("/cdn-cgi/l/email-protection")) {
+		    return false;
+		}
+		
 		// disallowed in robots.txt
 		if (link.startsWith("/docs")
 				|| link.startsWith("/referral")
@@ -126,6 +134,7 @@ public class Crawler extends Thread implements Runnable {
 			return false;
 		}
 		
+		// ignore scripting languages and pictures
 		if (link.contains(".css")
 				|| link.contains(".js")
 				|| link.contains(".png")
@@ -140,7 +149,7 @@ public class Crawler extends Thread implements Runnable {
 	}
 	
 	private String removeQuotes(String href) {
-		if(href == null || href.isBlank()) {
+		if(href == null || href.trim().length() == 0) {
 			return null;
 		}
 		href = href.replaceAll("'", "");
@@ -151,11 +160,11 @@ public class Crawler extends Thread implements Runnable {
 	
 	// extract <a> tag having href attribute
 	// extract value of href attribute, embraced by either 'xxx' or "xxx"
-	private static Pattern pattern = Pattern.compile("<[a|link][^>]+href\s*=\s*(\"[^\"]*\"|'[^']*')", Pattern.CASE_INSENSITIVE|Pattern.DOTALL);
+	private static Pattern pattern = Pattern.compile("<[a|link][^>]+href\\s*=\\s*(\"[^\"]*\"|'[^']*')", Pattern.CASE_INSENSITIVE|Pattern.DOTALL);
 	
 	private Set<String> findLinks() throws Exception {
 		String content = this.getHTMLContent();
-		if(content == null || content.isBlank()) {
+		if(content == null || content.trim().length() == 0) {
 			return null;
 		}
 		
@@ -177,11 +186,8 @@ public class Crawler extends Thread implements Runnable {
 		while(!Thread.currentThread().isInterrupted())
 		{
 			try {
-				int remainingNumberOfLinks = linkInfo.getRoughNumberOfLinksRemainingToCrawl();
-				System.out.println(Thread.currentThread().getName() + " Rough number of links remaining to crawl: " + remainingNumberOfLinks);
-				
-				this.path = linkInfo.getNextLinkToCrawl();
-				if (this.path == null || this.path.isBlank()) {
+			    this.path = linkInfo.getNextLinkToCrawl();
+				if (this.path == null || this.path.length() == 0) {
 					
 					try {
 						Thread.sleep(1000);
@@ -192,6 +198,8 @@ public class Crawler extends Thread implements Runnable {
 					
 					continue;
 				}
+				
+				linkInfo.printLinkSizeStatus();
 				
 				System.out.println(Thread.currentThread().getName() + " starts to crawl " + this.path);
 				
@@ -217,6 +225,10 @@ public class Crawler extends Thread implements Runnable {
 				
 				System.out.println(Thread.currentThread().getName() + " Number of links found: " + links.size() + "/" + countInScope + "/" + countOutOfScope + " in " + this.path);
 
+			} catch (PageLoadException ex) {
+			    System.out.println(Thread.currentThread().getName() + " Error: Fail to find links in " + this.path + " due to " + ex.getMessage() + ". Stop crawling this link.");
+			    // failed link no longer handled
+			    linkInfo.addLinkNotAccessible(this.path);
 			} catch (Exception e) {
 				System.out.println(Thread.currentThread().getName() + " Error: Fail to find links in " + this.path + " due to " + e.getMessage() + ". Add it back to crawling list.");
 				// add back the link for crawling later

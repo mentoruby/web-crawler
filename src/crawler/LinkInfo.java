@@ -10,8 +10,13 @@ public class LinkInfo {
 	private static Set<String> linksInScope = Collections.synchronizedSet(new HashSet<String>());
 	private static ConcurrentLinkedDeque<String> linksToCrawl = new ConcurrentLinkedDeque<String>();
 	private static Set<String> linksOutOfScope = Collections.synchronizedSet(new HashSet<String>());
+    private static Set<String> linksNotAccessisble = Collections.synchronizedSet(new HashSet<String>());
 
-	public int getRoughNumberOfLinksRemainingToCrawl() {
+	public int getNumberOfLinksAlreadyInScope() {
+	    return linksInScope.size();
+	}
+	
+	public int getNumberOfLinksPendingToCrawl() {
 		/*
 		 * this method is NOT a constant-time operation. 
 		 * Because of the asynchronous nature of these deques, determining the current number of elements requires traversing them all to count them.
@@ -24,7 +29,6 @@ public class LinkInfo {
 	
 	public String getNextLinkToCrawl() {
 		try {
-			System.out.println("rough number of links remaining to crawl: " + linksToCrawl.size());
 			return linksToCrawl.pop();
 		} catch (NoSuchElementException ex) {
 			return null;
@@ -53,10 +57,14 @@ public class LinkInfo {
 	public void addLinkOutOfScope(String link) {
 		linksOutOfScope.add(link);
 	}
+    
+    public void addLinkNotAccessible(String link) {
+        linksNotAccessisble.add(link);
+    }
 	
 	public void printLinksInScope() {
 		synchronized (linksInScope) {
-			System.out.println("links within scope: ");
+			System.out.println("number of links within scope: " + linksInScope.size());
 			int count = 1;
 			for (String link : linksInScope) {
 				System.out.println(count + ": " + link);
@@ -67,21 +75,40 @@ public class LinkInfo {
 	
 	public void printLinksOutOfScope() {
 		synchronized (linksOutOfScope) {
-			System.out.println("links not in scope: ");
-			int count = 1;
-			for (String link : linksOutOfScope) {
-				System.out.println(count + ": " + link);
-				++count;
-			}
+			System.out.println("number of links not in scope: " + linksOutOfScope.size());
+//			int count = 1;
+//			for (String link : linksOutOfScope) {
+//				System.out.println(count + ": " + link);
+//				++count;
+//			}
 		}
 	}
+    
+    public void printLinksNotAccessible() {
+        synchronized (linksNotAccessisble) {
+            System.out.println("number of links not accessible: " + linksNotAccessisble.size());
+            int count = 1;
+            for (String link : linksNotAccessisble) {
+                System.out.println(count + ": " + link);
+                ++count;
+            }
+        }
+    }
 	
 	public void printLinksToCrawl() {
 		synchronized (linksToCrawl) {
-			System.out.println("links remaining to crawl: ");
+			System.out.println("number of links remaining to crawl: " + linksToCrawl.size());
+            int count = 1;
 			for(String link : linksToCrawl) {
-				System.out.println("link to crawl - " + link);
+                System.out.println(count + ": " + link);
+                ++count;
 			}
 		}
 	}
+    
+    public void printLinkSizeStatus() {
+        int numOfLinksInScope = this.getNumberOfLinksAlreadyInScope();
+        int numOfLinksTBC = this.getNumberOfLinksPendingToCrawl();
+        System.out.println(Thread.currentThread().getName() + " Number of links: " + numOfLinksInScope + "(in scope) " + numOfLinksTBC + "(pending to crawl)");
+    }
 }
