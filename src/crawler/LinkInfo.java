@@ -11,6 +11,12 @@ public class LinkInfo {
 	private static ConcurrentLinkedDeque<String> linksToCrawl = new ConcurrentLinkedDeque<String>();
 	private static Set<String> linksOutOfScope = Collections.synchronizedSet(new HashSet<String>());
     private static Set<String> linksNotAccessisble = Collections.synchronizedSet(new HashSet<String>());
+    
+    /*
+     * Collections.synchronizedSet
+     * It is imperative that the user manually synchronize on the returned set when iterating over it.
+     * Failure to follow this advice may result in non-deterministic behavior.
+     */
 
 	public int getNumberOfLinksAlreadyInScope() {
 	    return linksInScope.size();
@@ -35,23 +41,21 @@ public class LinkInfo {
 		}
 	}
 	
-	public void addLinkToCrawl(String link) {
-		synchronized (linksToCrawl) {
-			if (!linksToCrawl.contains(link)) {
-				linksToCrawl.add(link);
-			}
-		}
+	public synchronized void addLinkToCrawl(String link) {
+	    // contains() itself is thread-safe, but not including the subsequence actions
+	    // synchronized is used to encapsulate both contains() and add() together to be a single, atomic operation
+	    if (!linksToCrawl.contains(link)) {
+            linksToCrawl.add(link);
+        }
 	}
 	
-	public void addLinkInScope(String link) {
-		synchronized (linksInScope) {
-			if (!linksInScope.contains(link)) {
-				if (!linksToCrawl.contains(link)) {
-					linksToCrawl.add(link);
-				}
-				linksInScope.add(link);
-			}
-		}
+	public synchronized void addLinkInScope(String link) {
+        // contains() itself is thread-safe, but not including the subsequence actions
+        // synchronized is used to encapsulate all sequential actions to be a single and atomic operation
+	    if (!linksInScope.contains(link)) {
+            this.addLinkToCrawl(link); // another synchronized method, be careful of dead loop
+            linksInScope.add(link);
+        }
 	}
 	
 	public void addLinkOutOfScope(String link) {
